@@ -1,5 +1,6 @@
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{Ordering, AtomicU64};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
@@ -10,7 +11,7 @@ use std::thread;
     [47, 54] bits means the identifier of the server . So max identifier of server is 2^8-1=255.
     [55, 64] bits means the serial number in the same millisecond . So the number we can generate in one millisecond is 2^10=1024 .
 */
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct SnowFlake{
     server_shift:   i32,
     serial_shift:   i32,
@@ -19,6 +20,8 @@ pub struct SnowFlake{
     serial_arc:     Arc<Mutex<u64>>,
     server_id:      u64,
     max_serial_num: u64,
+    id_num:         AtomicU64,
+    atomic_last_ms: AtomicU64,
 }
 
 impl SnowFlake {
@@ -33,10 +36,47 @@ impl SnowFlake {
             serial_arc:  Arc::new(Mutex::new(0)),
             server_id: 0,
             max_serial_num: (1<<serial_shift) -1,
+            id_num: AtomicU64::new(0),
+            atomic_last_ms: AtomicU64::new(0),
         };
         return snow_flake;
     }
     
+    /*
+        @brief generate uniq_id with no lock
+     */
+    pub fn no_lock_uniq_id(&mut self) -> u64{
+        let now = SystemTime::now();
+        let now_ms = now.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+        let max_try_time = 10;
+        let mut flag = false;
+        let mut serial_id:u64 = 0;
+        for try_time in 0..max_try_time {
+            serial_id = self.id_num.fetch_add(1, Ordering::Relaxed);
+            if serial_id > self.max_serial_num{
+                //超过则要从0开始
+                let last_ms2 = self.atomic_last_ms.load(Ordering::Relaxed);
+                if now_ms == last_ms2{
+                    //需要等待到下一个毫秒
+                    if serial_id == self.max_serial_num + 1{
+                        let now_micros = now.duration_since(UNIX_EPOCH).unwrap().as_micros() as u64;
+                        thread::sleep(Duration::from_micros(1000-(now_micros%1000)));
+                    }
+                }
+                self.id_num.store(0, Ordering::Relaxed);
+            }else{
+                flag = true;
+                break;
+            }
+        }
+        if !flag {
+            return 0;
+        }
+        let uniq_id: u64 = (now_ms << (self.time_shift)) | (self.server_id << self.serial_shift) | serial_id;
+        self.atomic_last_ms.store(now_ms, Ordering::Relaxed);
+        return uniq_id;
+    }
+
     pub fn next_uniq_id(&mut self) -> u64{
         let mut serial = self.serial_arc.lock().unwrap();
         let now = SystemTime::now();
