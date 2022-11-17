@@ -7,9 +7,9 @@ use std::thread;
 /*
     Snowflake algorithm to generate unique identifiers in distributed systems .
     The unique identifier is an unsigned 64 bits integer.
-    [1, 46] bits means the current UNIX timestamp in milliseconds . The max timestamp is 2^46-1=70368744177663. So the max date is 4199-11-24 .
-    [47, 54] bits means the identifier of the server . So max identifier of server is 2^8-1=255.
-    [55, 64] bits means the serial number in the same millisecond . So the number we can generate in one millisecond is 2^10=1024 .
+    [1, 43] bits means the current UNIX timestamp in milliseconds . The max timestamp is 2^46-1=70368744177663. So the max date is 4199-11-24 .
+    [44, 51] bits means the identifier of the server . So max identifier of server is 2^8-1=255.
+    [52, 64] bits means the serial number in the same millisecond . So the number we can generate in one millisecond is 2^13=8191 .
 */
 // #[derive(Clone)]
 pub struct SnowFlake{
@@ -27,7 +27,8 @@ pub struct SnowFlake{
 impl SnowFlake {
     pub fn new() -> SnowFlake{
         let server_shift =  8;
-        let serial_shift = 10;
+        let serial_shift = 13;
+        // let serial_shift = 12;
         let snow_flake =  SnowFlake{
             server_shift: server_shift,
             serial_shift: serial_shift,
@@ -60,7 +61,6 @@ impl SnowFlake {
                     //需要等待到下一个毫秒
                     if serial_id == self.max_serial_num + 1{
                         let now_micros = now.duration_since(UNIX_EPOCH).unwrap().as_micros() as u64;
-                        // println!("thread::sleep now_micros%1000:{} sleep_miros:{}", now_micros%1000, 1000-(now_micros%1000));
                         thread::sleep(Duration::from_micros(1000-(now_micros%1000)));
                     }
                 }
@@ -91,7 +91,6 @@ impl SnowFlake {
             if *serial < self.max_serial_num{
                 *serial += 1;
             }else{
-                println!("thread::sleep now_micros:{} now_micros%1000:{} sleep_miros:{}", now_micros, now_micros%1000, 1000-(now_micros%1000));
                 thread::sleep(Duration::from_micros(1000-(now_micros%1000)));
                 *serial = 0;
             }
