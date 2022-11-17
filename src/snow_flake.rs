@@ -60,11 +60,15 @@ impl SnowFlake {
                     //需要等待到下一个毫秒
                     if serial_id == self.max_serial_num + 1{
                         let now_micros = now.duration_since(UNIX_EPOCH).unwrap().as_micros() as u64;
+                        // println!("thread::sleep now_micros%1000:{} sleep_miros:{}", now_micros%1000, 1000-(now_micros%1000));
                         thread::sleep(Duration::from_micros(1000-(now_micros%1000)));
                     }
                 }
                 self.id_num.store(0, Ordering::Relaxed);
             }else{
+                if self.atomic_last_ms.load(Ordering::Relaxed) != now_ms{
+                    self.id_num.store(0, Ordering::Relaxed);
+                }
                 flag = true;
                 break;
             }
@@ -87,6 +91,7 @@ impl SnowFlake {
             if *serial < self.max_serial_num{
                 *serial += 1;
             }else{
+                println!("thread::sleep now_micros:{} now_micros%1000:{} sleep_miros:{}", now_micros, now_micros%1000, 1000-(now_micros%1000));
                 thread::sleep(Duration::from_micros(1000-(now_micros%1000)));
                 *serial = 0;
             }

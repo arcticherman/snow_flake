@@ -38,12 +38,12 @@ mod tests {
         }
         let op_num = arc_op_num.lock().unwrap();
         println!("op_num:{}", *op_num);
-        let uniq_num = 100000;
+        let uniq_num = 1000000;
         let mut now = SystemTime::now();
         let st_ms = now.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
         for i in 0..uniq_num{
-            // let uniq_id = snow_flake.next_uniq_id();
-            let uniq_id = snow_flake.no_lock_uniq_id();
+            let uniq_id = snow_flake.next_uniq_id();
+            // let uniq_id = snow_flake.no_lock_uniq_id();
             // println!("uniq_id:{:b}, {}", uniq_id, uniq_id);
         }
         now = SystemTime::now();
